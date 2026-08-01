@@ -47,6 +47,12 @@
     border-radius:8px;cursor:pointer;font-family:inherit}
   .env{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:15px;margin-bottom:10px;transition:opacity .15s}
   .env.dragging{opacity:.35}
+  .quickrow{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .chip{border:1px solid var(--border);background:var(--soft);color:var(--teal-d);font-size:12px;font-weight:500;
+    padding:5px 10px;border-radius:99px;cursor:pointer;font-family:inherit}
+  .chip:hover{background:var(--emerald-l);border-color:var(--emerald)}
+  .hist-edit{display:flex;gap:6px;align-items:center;padding:6px 0;flex-wrap:wrap}
+  .hist-edit input{flex:1 1 80px}
   .drag-handle{cursor:grab;touch-action:none;color:#c3ccc8;font-size:18px;line-height:1;padding:6px 4px 6px 0;user-select:none;-webkit-user-select:none}
   .drag-handle:active{cursor:grabbing}
   .env .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
@@ -296,6 +302,8 @@ function Depenses({ state, patch }) {
     const [addingCat, setAddingCat] = useState(false);
     const [nc, setNc] = useState({ emoji: "📦", name: "", budget: "" });
     const [showIncome, setShowIncome] = useState(false);
+    const [editingExp, setEditingExp] = useState(null);
+    const [edExp, setEdExp] = useState({ amount: "", note: "" });
     const [draggingId, setDraggingId] = useState(null);
     const catRefs = useRef({});
     const orderRef = useRef(state.categories);
@@ -374,10 +382,19 @@ function Depenses({ state, patch }) {
     const income = incomeForMonth(state.income, state.activeMonth);
     const reste = income - totalSpent;
     const shiftMonth = (d) => patch((s) => { const [y, m] = s.activeMonth.split("-").map(Number); const nd = new Date(y, m - 1 + d, 1); s.activeMonth = `${nd.getFullYear()}-${String(nd.getMonth() + 1).padStart(2, "0")}`; });
+    const bumpToTop = (s, catId) => { const idx = s.categories.findIndex((c) => c.id === catId); if (idx > 0) {
+        const [item] = s.categories.splice(idx, 1);
+        s.categories.unshift(item);
+    } };
     const addExpense = (catId) => { const a = parseAmount(expAmount); if (a <= 0)
-        return; patch((s) => { (s.expenses[s.activeMonth] = s.expenses[s.activeMonth] || []).push({ id: uid(), catId, amount: a, note: expNote.trim(), ts: Date.now() }); }); setExpAmount(""); setExpNote(""); setAddingExpFor(null); setExpandedCat(catId); };
+        return; patch((s) => { (s.expenses[s.activeMonth] = s.expenses[s.activeMonth] || []).push({ id: uid(), catId, amount: a, note: expNote.trim(), ts: Date.now() }); bumpToTop(s, catId); }); setExpAmount(""); setExpNote(""); setAddingExpFor(null); setExpandedCat(catId); };
+    const addExpenseQuick = (catId, amount) => { patch((s) => { (s.expenses[s.activeMonth] = s.expenses[s.activeMonth] || []).push({ id: uid(), catId, amount, note: "", ts: Date.now() }); bumpToTop(s, catId); }); setExpandedCat(catId); };
     const delExpense = (id) => { if (!confirm("Supprimer cette dépense ? Cette action est définitive."))
         return; patch((s) => { s.expenses[s.activeMonth] = (s.expenses[s.activeMonth] || []).filter((e) => e.id !== id); }); };
+    const saveExpEdit = (id) => { patch((s) => { const arr = s.expenses[s.activeMonth] || []; const e = arr.find((x) => x.id === id); if (e) {
+        e.amount = parseAmount(edExp.amount);
+        e.note = edExp.note.trim();
+    } }); setEditingExp(null); };
     const saveCat = (id) => patch((s) => { const c = s.categories.find((x) => x.id === id); if (c) {
         c.emoji = ed.emoji || "📦";
         c.name = ed.name.trim() || c.name;
@@ -463,16 +480,25 @@ function Depenses({ state, patch }) {
                         " \u25BE"),
                     React.createElement("button", { className: "btn btn-ghost", onClick: () => { setEditingCat(c.id); setEd({ emoji: c.emoji, name: c.name, budget: String(c.budget) }); } }, "\u270E"),
                     React.createElement("button", { className: "btn btn-ghost", onClick: () => delCat(c.id) }, "\uD83D\uDDD1")),
+                React.createElement("div", { className: "quickrow" }, [5, 10, 20, 50].map((amt) => (React.createElement("button", { key: amt, className: "chip", onClick: () => addExpenseQuick(c.id, amt) },
+                    "+",
+                    amt,
+                    "\u20AC")))),
                 addingExpFor === c.id && (React.createElement("div", { className: "inline" },
-                    React.createElement("input", { className: "w-amt", autoFocus: true, inputMode: "decimal", placeholder: "Montant \u20AC", value: expAmount, onChange: (e) => setExpAmount(e.target.value), onKeyDown: (e) => e.key === "Enter" && addExpense(c.id) }),
-                    React.createElement("input", { placeholder: "Note (facultatif)", value: expNote, onChange: (e) => setExpNote(e.target.value), onKeyDown: (e) => e.key === "Enter" && addExpense(c.id) }),
+                    React.createElement("input", { className: "w-amt", autoFocus: true, inputMode: "decimal", enterKeyHint: "done", placeholder: "Montant \u20AC", value: expAmount, onChange: (e) => setExpAmount(e.target.value), onKeyDown: (e) => e.key === "Enter" && addExpense(c.id) }),
+                    React.createElement("input", { enterKeyHint: "done", placeholder: "Note (facultatif)", value: expNote, onChange: (e) => setExpNote(e.target.value), onKeyDown: (e) => e.key === "Enter" && addExpense(c.id) }),
                     React.createElement("button", { className: "btn btn-ok", onClick: () => addExpense(c.id) }, "\u2713"))),
-                expandedCat === c.id && hist.length > 0 && (React.createElement("div", { className: "hist" }, hist.map((e) => (React.createElement("div", { className: "line", key: e.id },
+                expandedCat === c.id && hist.length > 0 && (React.createElement("div", { className: "hist" }, hist.map((e) => editingExp === e.id ? (React.createElement("div", { className: "hist-edit", key: e.id },
+                    React.createElement("input", { className: "w-amt", autoFocus: true, inputMode: "decimal", value: edExp.amount, onChange: (ev) => setEdExp({ ...edExp, amount: ev.target.value }) }),
+                    React.createElement("input", { placeholder: "Note", value: edExp.note, onChange: (ev) => setEdExp({ ...edExp, note: ev.target.value }) }),
+                    React.createElement("button", { className: "icon-btn", style: { color: "var(--emerald)" }, onClick: () => saveExpEdit(e.id) }, "\u2713"),
+                    React.createElement("button", { className: "icon-btn", onClick: () => setEditingExp(null) }, "\u2715"))) : (React.createElement("div", { className: "line", key: e.id },
                     React.createElement("span", { className: "muted" },
                         new Date(e.ts).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }),
                         e.note ? " · " + e.note : ""),
                     React.createElement("span", { className: "row gap" },
                         React.createElement("b", null, fmt(e.amount)),
+                        React.createElement("button", { className: "icon-btn", style: { color: "var(--muted)" }, onClick: () => { setEditingExp(e.id); setEdExp({ amount: String(e.amount), note: e.note || "" }); } }, "\u270E"),
                         React.createElement("button", { className: "icon-btn", onClick: () => delExpense(e.id) }, "\uD83D\uDDD1")))))))));
         }),
         addingCat ? (React.createElement("div", { className: "env" },
