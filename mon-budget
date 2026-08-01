@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mon budget</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<style>
+  :root{
+    --teal:#0f5b57; --teal-d:#0b3f3c; --emerald:#0e8a6b; --emerald-l:#e7f4ef;
+    --amber:#c8791e; --rose:#c6483c; --ink:#14201c; --muted:#6b7a75;
+    --bg:#eef2f1; --card:#ffffff; --border:#e2e7e4; --soft:#f4f7f6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:560px;margin:0 auto;padding:20px 16px 64px}
+  .row{display:flex;align-items:center}
+  .between{justify-content:space-between}
+  .gap{gap:8px}
+  .muted{color:var(--muted)}
+  .sm{font-size:12px}
+  .xs{font-size:11px}
+  h1{font-size:19px;font-weight:600;letter-spacing:-.01em;margin:0}
+  .logo{width:36px;height:36px;border-radius:12px;background:var(--teal-d);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px}
+  .tabbar{display:flex;gap:6px;background:var(--card);border:1px solid var(--border);
+    border-radius:14px;padding:5px;margin:14px 0 12px}
+  .tab{flex:1;border:0;background:transparent;color:var(--muted);font-size:14px;font-weight:500;
+    padding:9px 4px;border-radius:10px;cursor:pointer;font-family:inherit}
+  .tab.active{background:var(--teal-d);color:#fff}
+  .pillbar{display:flex;gap:6px;background:var(--card);border:1px solid var(--border);
+    border-radius:12px;padding:4px;margin-bottom:12px}
+  .pill{flex:1;border:0;background:transparent;color:var(--muted);font-size:14px;font-weight:500;
+    padding:8px;border-radius:9px;cursor:pointer;font-family:inherit}
+  .pill.active{background:var(--teal-d);color:#fff}
+  .navbtn{width:32px;height:32px;border-radius:10px;background:var(--card);border:1px solid var(--border);
+    color:var(--muted);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+  .hero{border-radius:18px;padding:20px;color:#fff;margin-bottom:16px;
+    background:linear-gradient(135deg,var(--teal) 0%,var(--teal-d) 100%);box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .hero .big{font-size:34px;font-weight:700;letter-spacing:-.02em;margin-top:4px}
+  .hbar{height:8px;border-radius:99px;background:rgba(255,255,255,.18);overflow:hidden;margin-top:16px}
+  .hbar>span{display:block;height:100%;background:rgba(255,255,255,.75);border-radius:99px;transition:width .3s}
+  .hlink{background:rgba(255,255,255,.15);border:0;color:#eafaf4;font-size:11px;padding:4px 8px;
+    border-radius:8px;cursor:pointer;font-family:inherit}
+  .env{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:15px;margin-bottom:10px}
+  .env .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .emoji{font-size:20px}
+  .name{font-weight:500;font-size:14px}
+  .reste{font-weight:600;font-size:15px}
+  .pos{color:var(--emerald)} .neg{color:var(--rose)}
+  .bar{height:8px;border-radius:99px;background:var(--soft);overflow:hidden;margin-top:12px}
+  .bar>span{display:block;height:100%;border-radius:99px;transition:width .3s}
+  .fill-ok{background:var(--emerald)} .fill-warn{background:var(--amber)} .fill-over{background:var(--rose)}
+  .acts{display:flex;gap:6px;margin-top:12px}
+  .btn{border:0;border-radius:10px;padding:9px 10px;font-size:14px;font-weight:500;cursor:pointer;
+    font-family:inherit;background:var(--soft);color:var(--muted);display:flex;align-items:center;
+    justify-content:center;gap:6px}
+  .btn.grow{flex:1}
+  .btn-primary{background:var(--teal-d);color:#fff}
+  .btn-ok{background:var(--emerald);color:#fff}
+  .btn-ghost{background:var(--soft);color:var(--muted)}
+  .btn:hover{filter:brightness(.97)}
+  input,select{font-family:inherit;font-size:14px;border:1px solid var(--border);border-radius:10px;
+    padding:9px 10px;background:#fff;color:var(--ink);outline:none;width:100%}
+  input:focus,select:focus{border-color:var(--teal)}
+  .inline{display:flex;gap:6px;align-items:center;margin-top:10px}
+  .w-amt{width:96px;flex:none;text-align:right}
+  .w-emoji{width:46px;flex:none;text-align:center;font-size:17px}
+  .hist{border-top:1px solid var(--soft);margin-top:10px;padding-top:8px}
+  .hist .line{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:4px 0}
+  .icon-btn{background:transparent;border:0;color:#c3ccc8;cursor:pointer;font-size:14px;padding:2px}
+  .icon-btn:hover{color:var(--rose)}
+  .addbtn{width:100%;margin-top:10px;background:rgba(255,255,255,.5);border:1px dashed #c9d3cf;
+    color:var(--muted);border-radius:16px;padding:13px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit}
+  .addbtn:hover{border-color:var(--teal);color:var(--teal-d)}
+  .link{background:transparent;border:0;color:var(--muted);font-size:12px;cursor:pointer;font-family:inherit;
+    display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:14px;padding:6px}
+  .link:hover{color:var(--rose)}
+  .foot{text-align:center;font-size:11px;color:#9aa8a3;margin-top:16px;line-height:1.6}
+  .badge{font-size:11px;background:var(--emerald-l);color:var(--emerald);padding:3px 8px;border-radius:99px;font-weight:500}
+  .warn{color:var(--amber)}
+  .advice{white-space:pre-wrap;font-size:14px;line-height:1.65;color:var(--ink)}
+  .note{background:var(--soft);border-radius:12px;padding:12px;font-size:12px;color:var(--muted);line-height:1.6}
+  .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;
+    border-radius:50%;display:inline-block;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .label{font-size:12px;color:var(--muted);margin-bottom:5px;display:block}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+"use strict";
+const { useState, useEffect, useMemo } = React;
+const KEY = "mon_budget_v1";
+const uid = () => Math.random().toString(36).slice(2, 9);
+/* ---------- Persistance (localStorage + repli mémoire) ---------- */
+let memFallback = null;
+const store = {
+    load() {
+        try {
+            const r = localStorage.getItem(KEY);
+            return r ? JSON.parse(r) : memFallback;
+        }
+        catch (e) {
+            return memFallback;
+        }
+    },
+    save(s) { try {
+        localStorage.setItem(KEY, JSON.stringify(s));
+    }
+    catch (e) {
+        memFallback = s;
+    } },
+};
+/* ---------- Valeurs de départ (tout modifiable) ---------- */
+const catsAujourdhui = () => [
+    { id: uid(), emoji: "🛒", name: "Courses", budget: 250 },
+    { id: uid(), emoji: "⛽", name: "Essence", budget: 100 },
+    { id: uid(), emoji: "🍽️", name: "Sorties & restos", budget: 80 },
+    { id: uid(), emoji: "👕", name: "Vêtements", budget: 40 },
+    { id: uid(), emoji: "📱", name: "Téléphone", budget: 15 },
+    { id: uid(), emoji: "🎬", name: "Abonnements", budget: 40 },
+    { id: uid(), emoji: "💪", name: "Sport", budget: 30 },
+    { id: uid(), emoji: "🎁", name: "Loisirs", budget: 50 },
+    { id: uid(), emoji: "🩹", name: "Santé", budget: 20 },
+    { id: uid(), emoji: "📦", name: "Divers", budget: 50 },
+];
+const catsAppartement = () => [
+    { id: uid(), emoji: "🏠", name: "Loyer", budget: 650 },
+    { id: uid(), emoji: "💡", name: "Élec / Gaz", budget: 55 },
+    { id: uid(), emoji: "💧", name: "Eau", budget: 20 },
+    { id: uid(), emoji: "🌐", name: "Internet", budget: 30 },
+    { id: uid(), emoji: "🛡️", name: "Assurance habitation", budget: 15 },
+    { id: uid(), emoji: "🛒", name: "Courses", budget: 300 },
+    { id: uid(), emoji: "⛽", name: "Essence", budget: 120 },
+    { id: uid(), emoji: "🍽️", name: "Sorties & restos", budget: 100 },
+    { id: uid(), emoji: "👕", name: "Vêtements", budget: 40 },
+    { id: uid(), emoji: "📱", name: "Téléphone", budget: 15 },
+    { id: uid(), emoji: "🎬", name: "Abonnements", budget: 40 },
+    { id: uid(), emoji: "💪", name: "Sport", budget: 30 },
+    { id: uid(), emoji: "🎁", name: "Loisirs", budget: 50 },
+    { id: uid(), emoji: "🩹", name: "Santé", budget: 20 },
+    { id: uid(), emoji: "📦", name: "Divers", budget: 60 },
+];
+const nowMonth = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
+const DEFAULTS = () => ({
+    activeTab: "depenses",
+    activeProfile: "aujourdhui",
+    activeMonth: nowMonth(),
+    profiles: {
+        aujourdhui: { label: "Aujourd'hui", income: 1698, categories: catsAujourdhui() },
+        appartement: { label: "Appartement", income: 1698, categories: catsAppartement() },
+    },
+    expenses: {},
+    savings: {
+        total: 1500,
+        envelopes: [
+            { id: uid(), emoji: "🏖️", name: "Voyage", amount: 400, goal: 800 },
+            { id: uid(), emoji: "📦", name: "Divers", amount: 100, goal: 300 },
+            { id: uid(), emoji: "🛟", name: "Sécurité", amount: 900, goal: 3000 },
+            { id: uid(), emoji: "✨", name: "Futur plaisir", amount: 100, goal: 500 },
+        ],
+    },
+    ai: { apiKey: "", model: "claude-sonnet-5" },
+});
+/* ---------- Helpers ---------- */
+const fmt = (n) => (Number(n) || 0).toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + " €";
+const parseAmount = (s) => {
+    const v = parseFloat(String(s).replace(",", ".").replace(/[^0-9.]/g, ""));
+    return isNaN(v) ? 0 : v;
+};
+const monthLabel = (key) => {
+    const [y, m] = key.split("-").map(Number);
+    const s = new Date(y, m - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+};
+const fillClass = (spent, budget) => {
+    const pct = budget > 0 ? spent / budget : spent > 0 ? 1.1 : 0;
+    return pct > 1 ? "fill-over" : pct > 0.85 ? "fill-warn" : "fill-ok";
+};
+function App() {
+    const [state, setState] = useState(null);
+    const [ready, setReady] = useState(false);
+    useEffect(() => { setState(store.load() || DEFAULTS()); setReady(true); }, []);
+    useEffect(() => { if (ready && state)
+        store.save(state); }, [state, ready]);
+    const patch = (fn) => setState((p) => { const n = structuredClone(p); fn(n); return n; });
+    if (!state)
+        return React.createElement("div", { className: "wrap muted" }, "Chargement\u2026");
+    return (React.createElement("div", { className: "wrap" },
+        React.createElement("div", { className: "row gap", style: { marginBottom: 4 } },
+            React.createElement("div", { className: "logo" }, "\uD83D\uDCB6"),
+            React.createElement("div", null,
+                React.createElement("h1", null, "Mon budget"),
+                React.createElement("div", { className: "sm muted", style: { marginTop: 2 } }, "Enveloppes & \u00E9pargne"))),
+        React.createElement("div", { className: "tabbar" }, [["depenses", "Dépenses"], ["epargne", "Épargne"], ["ia", "Conseils"]].map(([k, lbl]) => (React.createElement("button", { key: k, className: "tab" + (state.activeTab === k ? " active" : ""), onClick: () => patch((s) => { s.activeTab = k; }) }, lbl)))),
+        state.activeTab === "depenses" && React.createElement(Depenses, { state: state, patch: patch }),
+        state.activeTab === "epargne" && React.createElement(Epargne, { state: state, patch: patch }),
+        state.activeTab === "ia" && React.createElement(Conseils, { state: state }),
+        React.createElement("p", { className: "foot" },
+            "Donn\u00E9es enregistr\u00E9es automatiquement dans ton navigateur (localStorage).",
+            React.createElement("br", null),
+            "Rien n'est envoy\u00E9 en ligne, sauf si tu lances une analyse IA.")));
+}
+/* ================= ONGLET DÉPENSES ================= */
+function Depenses({ state, patch }) {
+    const [addingExpFor, setAddingExpFor] = useState(null);
+    const [expAmount, setExpAmount] = useState("");
+    const [expNote, setExpNote] = useState("");
+    const [expandedCat, setExpandedCat] = useState(null);
+    const [editingCat, setEditingCat] = useState(null);
+    const [ed, setEd] = useState({ emoji: "", name: "", budget: "" });
+    const [addingCat, setAddingCat] = useState(false);
+    const [nc, setNc] = useState({ emoji: "📦", name: "", budget: "" });
+    const [editIncome, setEditIncome] = useState(false);
+    const [incDraft, setIncDraft] = useState("");
+    const profile = state.profiles[state.activeProfile];
+    const expKey = `${state.activeProfile}|${state.activeMonth}`;
+    const monthExp = state.expenses[expKey] || [];
+    const spentByCat = (id) => monthExp.filter((e) => e.catId === id).reduce((s, e) => s + e.amount, 0);
+    const totalBudget = profile.categories.reduce((s, c) => s + (c.budget || 0), 0);
+    const totalSpent = monthExp.reduce((s, e) => s + e.amount, 0);
+    const income = profile.income || 0;
+    const reste = income - totalSpent;
+    const shiftMonth = (d) => patch((s) => {
+        const [y, m] = s.activeMonth.split("-").map(Number);
+        const nd = new Date(y, m - 1 + d, 1);
+        s.activeMonth = `${nd.getFullYear()}-${String(nd.getMonth() + 1).padStart(2, "0")}`;
+    });
+    const addExpense = (catId) => {
+        const a = parseAmount(expAmount);
+        if (a <= 0)
+            return;
+        patch((s) => {
+            const k = `${s.activeProfile}|${s.activeMonth}`;
+            (s.expenses[k] = s.expenses[k] || []).push({ id: uid(), catId, amount: a, note: expNote.trim(), ts: Date.now() });
+        });
+        setExpAmount("");
+        setExpNote("");
+        setAddingExpFor(null);
+        setExpandedCat(catId);
+    };
+    const delExpense = (id) => {
+        if (!confirm("Supprimer cette dépense ? Cette action est définitive."))
+            return;
+        patch((s) => {
+            const k = `${s.activeProfile}|${s.activeMonth}`;
+            s.expenses[k] = (s.expenses[k] || []).filter((e) => e.id !== id);
+        });
+    };
+    const saveCat = (id) => patch((s) => {
+        const c = s.profiles[s.activeProfile].categories.find((x) => x.id === id);
+        if (c) {
+            c.emoji = ed.emoji || "📦";
+            c.name = ed.name.trim() || c.name;
+            c.budget = parseAmount(ed.budget);
+        }
+    });
+    const delCat = (id) => {
+        const c = profile.categories.find((x) => x.id === id);
+        if (!confirm(`Supprimer le poste « ${c ? c.name : ""} » ? Cette action est définitive.`))
+            return;
+        patch((s) => {
+            s.profiles[s.activeProfile].categories =
+                s.profiles[s.activeProfile].categories.filter((x) => x.id !== id);
+        });
+    };
+    const addCat = () => {
+        if (!nc.name.trim())
+            return;
+        patch((s) => {
+            s.profiles[s.activeProfile].categories.push({ id: uid(), emoji: nc.emoji || "📦", name: nc.name.trim(), budget: parseAmount(nc.budget) });
+        });
+        setNc({ emoji: "📦", name: "", budget: "" });
+        setAddingCat(false);
+    };
+    const resetMonth = () => {
+        if (!confirm("Effacer toutes les dépenses de ce mois ? Tes budgets ne changent pas."))
+            return;
+        patch((s) => { s.expenses[`${s.activeProfile}|${s.activeMonth}`] = []; });
+    };
+    return (React.createElement("div", null,
+        React.createElement("div", { className: "pillbar" }, Object.entries(state.profiles).map(([k, p]) => (React.createElement("button", { key: k, className: "pill" + (state.activeProfile === k ? " active" : ""), onClick: () => patch((s) => { s.activeProfile = k; }) }, p.label)))),
+        React.createElement("div", { className: "row between", style: { marginBottom: 12 } },
+            React.createElement("button", { className: "navbtn", onClick: () => shiftMonth(-1) }, "\u2039"),
+            React.createElement("span", { className: "sm", style: { fontWeight: 500 } }, monthLabel(state.activeMonth)),
+            React.createElement("button", { className: "navbtn", onClick: () => shiftMonth(1) }, "\u203A")),
+        React.createElement("div", { className: "hero" },
+            React.createElement("div", { className: "row between" },
+                React.createElement("span", { className: "sm", style: { opacity: .8 } }, "Reste \u00E0 vivre ce mois"),
+                React.createElement("button", { className: "hlink", onClick: () => { setEditIncome(true); setIncDraft(String(income)); } }, "\u270E revenus")),
+            editIncome ? (React.createElement("div", { className: "inline" },
+                React.createElement("input", { autoFocus: true, value: incDraft, inputMode: "decimal", onChange: (e) => setIncDraft(e.target.value), style: { width: 130 } }),
+                React.createElement("button", { className: "btn btn-ok", onClick: () => { patch((s) => { s.profiles[s.activeProfile].income = parseAmount(incDraft); }); setEditIncome(false); } }, "\u2713"),
+                React.createElement("button", { className: "btn btn-ghost", onClick: () => setEditIncome(false) }, "\u2715"))) : React.createElement("div", { className: "big" }, fmt(reste)),
+            React.createElement("div", { className: "hbar" },
+                React.createElement("span", { style: { width: (income > 0 ? Math.min(100, totalSpent / income * 100) : 0) + "%" } })),
+            React.createElement("div", { className: "row between xs", style: { opacity: .85, marginTop: 8 } },
+                React.createElement("span", null,
+                    "Revenus ",
+                    fmt(income)),
+                React.createElement("span", null,
+                    "D\u00E9pens\u00E9 ",
+                    fmt(totalSpent))),
+            React.createElement("div", { className: "xs", style: { opacity: .8, marginTop: 4 } },
+                "Budg\u00E9t\u00E9 ",
+                fmt(totalBudget),
+                " \u00B7 ",
+                totalBudget > income
+                    ? React.createElement("span", { className: "warn", style: { color: "#f4c98a" } },
+                        "d\u00E9passe tes revenus de ",
+                        fmt(totalBudget - income))
+                    : React.createElement("span", null,
+                        fmt(income - totalBudget),
+                        " non budg\u00E9t\u00E9"))),
+        profile.categories.map((c) => {
+            const spent = spentByCat(c.id), r = c.budget - spent;
+            const pct = c.budget > 0 ? Math.min(100, spent / c.budget * 100) : spent > 0 ? 100 : 0;
+            const hist = monthExp.filter((e) => e.catId === c.id).sort((a, b) => b.ts - a.ts);
+            if (editingCat === c.id)
+                return (React.createElement("div", { className: "env", key: c.id },
+                    React.createElement("div", { className: "inline", style: { marginTop: 0 } },
+                        React.createElement("input", { className: "w-emoji", maxLength: 2, value: ed.emoji, onChange: (e) => setEd({ ...ed, emoji: e.target.value }) }),
+                        React.createElement("input", { value: ed.name, placeholder: "Nom", onChange: (e) => setEd({ ...ed, name: e.target.value }) }),
+                        React.createElement("input", { className: "w-amt", inputMode: "decimal", value: ed.budget, placeholder: "\u20AC", onChange: (e) => setEd({ ...ed, budget: e.target.value }) }),
+                        React.createElement("button", { className: "btn btn-ok", onClick: () => { saveCat(c.id); setEditingCat(null); } }, "\u2713"),
+                        React.createElement("button", { className: "btn btn-ghost", onClick: () => setEditingCat(null) }, "\u2715"))));
+            return (React.createElement("div", { className: "env", key: c.id },
+                React.createElement("div", { className: "top" },
+                    React.createElement("div", { className: "row gap", style: { minWidth: 0 } },
+                        React.createElement("span", { className: "emoji" }, c.emoji),
+                        React.createElement("div", { style: { minWidth: 0 } },
+                            React.createElement("div", { className: "name" }, c.name),
+                            React.createElement("div", { className: "sm muted" },
+                                fmt(spent),
+                                " sur ",
+                                fmt(c.budget)))),
+                    React.createElement("div", { style: { textAlign: "right" } },
+                        React.createElement("div", { className: "reste " + (r < 0 ? "neg" : "pos") }, fmt(r)),
+                        React.createElement("div", { className: "xs muted" }, r < 0 ? "dépassé" : "reste"))),
+                React.createElement("div", { className: "bar" },
+                    React.createElement("span", { className: fillClass(spent, c.budget), style: { width: pct + "%" } })),
+                React.createElement("div", { className: "acts" },
+                    React.createElement("button", { className: "btn btn-primary grow", onClick: () => { setAddingExpFor(addingExpFor === c.id ? null : c.id); setExpAmount(""); setExpNote(""); } }, "+ D\u00E9pense"),
+                    hist.length > 0 && React.createElement("button", { className: "btn btn-ghost", onClick: () => setExpandedCat(expandedCat === c.id ? null : c.id) },
+                        hist.length,
+                        " \u25BE"),
+                    React.createElement("button", { className: "btn btn-ghost", onClick: () => { setEditingCat(c.id); setEd({ emoji: c.emoji, name: c.name, budget: String(c.budget) }); } }, "\u270E"),
+                    React.createElement("button", { className: "btn btn-ghost", onClick: () => delCat(c.id) }, "\uD83D\uDDD1")),
+                addingExpFor === c.id && (React.createElement("div", { className: "inline" },
+                    React.createElement("input", { className: "w-amt", autoFocus: true, inputMode: "decimal", placeholder: "Montant \u20AC", value: expAmount, onChange: (e) => setExpAmount(e.target.value), onKeyDown: (e) => e.key === "Enter" && addExpense(c.id) }),
+                    React.createElement("input", { placeholder: "Note (facultatif)", value: expNote, onChange: (e) => setExpNote(e.target.value), onKeyDown: (e) => e.key === "Enter" && addExpense(c.id) }),
+                    React.createElement("button", { className: "btn btn-ok", onClick: () => addExpense(c.id) }, "\u2713"))),
+                expandedCat === c.id && hist.length > 0 && (React.createElement("div", { className: "hist" }, hist.map((e) => (React.createElement("div", { className: "line", key: e.id },
+                    React.createElement("span", { className: "muted" },
+                        new Date(e.ts).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }),
+                        e.note ? " · " + e.note : ""),
+                    React.createElement("span", { className: "row gap" },
+                        React.createElement("b", null, fmt(e.amount)),
+                        React.createElement("button", { className: "icon-btn", onClick: () => delExpense(e.id) }, "\uD83D\uDDD1")))))))));
+        }),
+        addingCat ? (React.createElement("div", { className: "env" },
+            React.createElement("div", { className: "inline", style: { marginTop: 0 } },
+                React.createElement("input", { className: "w-emoji", maxLength: 2, value: nc.emoji, onChange: (e) => setNc({ ...nc, emoji: e.target.value }) }),
+                React.createElement("input", { autoFocus: true, placeholder: "Nouveau poste", value: nc.name, onChange: (e) => setNc({ ...nc, name: e.target.value }) }),
+                React.createElement("input", { className: "w-amt", inputMode: "decimal", placeholder: "\u20AC", value: nc.budget, onChange: (e) => setNc({ ...nc, budget: e.target.value }) })),
+            React.createElement("div", { className: "acts" },
+                React.createElement("button", { className: "btn btn-primary grow", onClick: addCat }, "Ajouter"),
+                React.createElement("button", { className: "btn btn-ghost", onClick: () => setAddingCat(false) }, "Annuler")))) : React.createElement("button", { className: "addbtn", onClick: () => setAddingCat(true) }, "+ Ajouter un poste"),
+        React.createElement("button", { className: "link", onClick: resetMonth },
+            "\u21BA R\u00E9initialiser les d\u00E9penses de ",
+            monthLabel(state.activeMonth))));
+}
+/* ================= ONGLET ÉPARGNE ================= */
+function Epargne({ state, patch }) {
+    const [editTotal, setEditTotal] = useState(false);
+    const [totalDraft, setTotalDraft] = useState("");
+    const [editing, setEditing] = useState(null);
+    const [ed, setEd] = useState({ emoji: "", name: "", amount: "", goal: "" });
+    const [adding, setAdding] = useState(false);
+    const [ne, setNe] = useState({ emoji: "🎯", name: "", amount: "", goal: "" });
+    const sav = state.savings;
+    const reparti = sav.envelopes.reduce((s, e) => s + (e.amount || 0), 0);
+    const nonReparti = sav.total - reparti;
+    const saveEnv = (id) => patch((s) => {
+        const e = s.savings.envelopes.find((x) => x.id === id);
+        if (e) {
+            e.emoji = ed.emoji || "🎯";
+            e.name = ed.name.trim() || e.name;
+            e.amount = parseAmount(ed.amount);
+            e.goal = parseAmount(ed.goal);
+        }
+    });
+    const delEnv = (id) => {
+        const e = sav.envelopes.find((x) => x.id === id);
+        if (!confirm(`Supprimer l'enveloppe « ${e ? e.name : ""} » ? Cette action est définitive.`))
+            return;
+        patch((s) => { s.savings.envelopes = s.savings.envelopes.filter((x) => x.id !== id); });
+    };
+    const addEnv = () => {
+        if (!ne.name.trim())
+            return;
+        patch((s) => { s.savings.envelopes.push({ id: uid(), emoji: ne.emoji || "🎯", name: ne.name.trim(), amount: parseAmount(ne.amount), goal: parseAmount(ne.goal) }); });
+        setNe({ emoji: "🎯", name: "", amount: "", goal: "" });
+        setAdding(false);
+    };
+    return (React.createElement("div", null,
+        React.createElement("div", { className: "hero" },
+            React.createElement("div", { className: "row between" },
+                React.createElement("span", { className: "sm", style: { opacity: .8 } }, "\u00C9pargne totale"),
+                React.createElement("button", { className: "hlink", onClick: () => { setEditTotal(true); setTotalDraft(String(sav.total)); } }, "\u270E modifier")),
+            editTotal ? (React.createElement("div", { className: "inline" },
+                React.createElement("input", { autoFocus: true, inputMode: "decimal", value: totalDraft, onChange: (e) => setTotalDraft(e.target.value), style: { width: 140 } }),
+                React.createElement("button", { className: "btn btn-ok", onClick: () => { patch((s) => { s.savings.total = parseAmount(totalDraft); }); setEditTotal(false); } }, "\u2713"),
+                React.createElement("button", { className: "btn btn-ghost", onClick: () => setEditTotal(false) }, "\u2715"))) : React.createElement("div", { className: "big" }, fmt(sav.total)),
+            React.createElement("div", { className: "row between xs", style: { opacity: .85, marginTop: 14 } },
+                React.createElement("span", null,
+                    "R\u00E9parti ",
+                    fmt(reparti)),
+                React.createElement("span", null, nonReparti < 0
+                    ? React.createElement("span", { style: { color: "#f4c98a" } },
+                        "sur-r\u00E9parti de ",
+                        fmt(-nonReparti))
+                    : React.createElement("span", null,
+                        "Non r\u00E9parti ",
+                        fmt(nonReparti))))),
+        React.createElement("div", { className: "sm muted", style: { margin: "0 2px 8px" } }, "R\u00E9partis ton pot commun en enveloppes \uD83D\uDC47"),
+        sav.envelopes.map((e) => {
+            const pct = e.goal > 0 ? Math.min(100, e.amount / e.goal * 100) : e.amount > 0 ? 100 : 0;
+            if (editing === e.id)
+                return (React.createElement("div", { className: "env", key: e.id },
+                    React.createElement("div", { className: "inline", style: { marginTop: 0 } },
+                        React.createElement("input", { className: "w-emoji", maxLength: 2, value: ed.emoji, onChange: (ev) => setEd({ ...ed, emoji: ev.target.value }) }),
+                        React.createElement("input", { value: ed.name, placeholder: "Nom", onChange: (ev) => setEd({ ...ed, name: ev.target.value }) })),
+                    React.createElement("div", { className: "inline" },
+                        React.createElement("div", { style: { flex: 1 } },
+                            React.createElement("span", { className: "label" }, "Montant"),
+                            React.createElement("input", { inputMode: "decimal", value: ed.amount, onChange: (ev) => setEd({ ...ed, amount: ev.target.value }) })),
+                        React.createElement("div", { style: { flex: 1 } },
+                            React.createElement("span", { className: "label" }, "Objectif"),
+                            React.createElement("input", { inputMode: "decimal", value: ed.goal, onChange: (ev) => setEd({ ...ed, goal: ev.target.value }) }))),
+                    React.createElement("div", { className: "acts" },
+                        React.createElement("button", { className: "btn btn-ok grow", onClick: () => { saveEnv(e.id); setEditing(null); } }, "Enregistrer"),
+                        React.createElement("button", { className: "btn btn-ghost", onClick: () => setEditing(null) }, "Annuler"))));
+            return (React.createElement("div", { className: "env", key: e.id },
+                React.createElement("div", { className: "top" },
+                    React.createElement("div", { className: "row gap", style: { minWidth: 0 } },
+                        React.createElement("span", { className: "emoji" }, e.emoji),
+                        React.createElement("div", null,
+                            React.createElement("div", { className: "name" }, e.name),
+                            React.createElement("div", { className: "sm muted" }, e.goal > 0 ? `objectif ${fmt(e.goal)}` : "sans objectif"))),
+                    React.createElement("div", { style: { textAlign: "right" } },
+                        React.createElement("div", { className: "reste pos" }, fmt(e.amount)),
+                        e.goal > 0 && React.createElement("div", { className: "xs muted" },
+                            Math.round(pct),
+                            " %"))),
+                e.goal > 0 && React.createElement("div", { className: "bar" },
+                    React.createElement("span", { className: "fill-ok", style: { width: pct + "%" } })),
+                React.createElement("div", { className: "acts" },
+                    React.createElement("button", { className: "btn btn-ghost grow", onClick: () => { setEditing(e.id); setEd({ emoji: e.emoji, name: e.name, amount: String(e.amount), goal: String(e.goal) }); } }, "\u270E Ajuster"),
+                    React.createElement("button", { className: "btn btn-ghost", onClick: () => delEnv(e.id) }, "\uD83D\uDDD1"))));
+        }),
+        adding ? (React.createElement("div", { className: "env" },
+            React.createElement("div", { className: "inline", style: { marginTop: 0 } },
+                React.createElement("input", { className: "w-emoji", maxLength: 2, value: ne.emoji, onChange: (e) => setNe({ ...ne, emoji: e.target.value }) }),
+                React.createElement("input", { autoFocus: true, placeholder: "Nouvelle enveloppe", value: ne.name, onChange: (e) => setNe({ ...ne, name: e.target.value }) })),
+            React.createElement("div", { className: "inline" },
+                React.createElement("div", { style: { flex: 1 } },
+                    React.createElement("span", { className: "label" }, "Montant"),
+                    React.createElement("input", { inputMode: "decimal", value: ne.amount, onChange: (e) => setNe({ ...ne, amount: e.target.value }) })),
+                React.createElement("div", { style: { flex: 1 } },
+                    React.createElement("span", { className: "label" }, "Objectif"),
+                    React.createElement("input", { inputMode: "decimal", value: ne.goal, onChange: (e) => setNe({ ...ne, goal: e.target.value }) }))),
+            React.createElement("div", { className: "acts" },
+                React.createElement("button", { className: "btn btn-primary grow", onClick: addEnv }, "Ajouter"),
+                React.createElement("button", { className: "btn btn-ghost", onClick: () => setAdding(false) }, "Annuler")))) : React.createElement("button", { className: "addbtn", onClick: () => setAdding(true) }, "+ Ajouter une enveloppe"),
+        React.createElement("div", { className: "note", style: { marginTop: 14 } }, "\uD83D\uDCA1 Rep\u00E8re utile : une enveloppe \u00AB S\u00E9curit\u00E9 \u00BB (fonds d'urgence) solide vise g\u00E9n\u00E9ralement l'\u00E9quivalent de 3 \u00E0 6 mois de tes d\u00E9penses courantes.")));
+}
+/* ================= ONGLET CONSEILS (coach local, sans clé) ================= */
+function Conseils({ state }) {
+    const profile = state.profiles[state.activeProfile];
+    const expKey = `${state.activeProfile}|${state.activeMonth}`;
+    const monthExp = state.expenses[expKey] || [];
+    const spentByCat = (id) => monthExp.filter((e) => e.catId === id).reduce((s, e) => s + e.amount, 0);
+    const income = profile.income || 0;
+    const totalBudget = profile.categories.reduce((s, c) => s + (c.budget || 0), 0);
+    const totalSpent = monthExp.reduce((s, e) => s + e.amount, 0);
+    const reste = income - totalSpent;
+    const sav = state.savings;
+    const reparti = sav.envelopes.reduce((s, e) => s + (e.amount || 0), 0);
+    const nonReparti = sav.total - reparti;
+    const items = [];
+    const push = (sev, text) => items.push({ sev, text });
+    if (totalBudget > income && income > 0)
+        push(1, `Tes budgets cumulés (${fmt(totalBudget)}) dépassent tes revenus (${fmt(income)}) de ${fmt(totalBudget - income)}. Allège un ou deux postes pour rester réaliste.`);
+    const over = profile.categories.map((c) => ({ c, spent: spentByCat(c.id) })).filter((x) => x.spent > x.c.budget && x.spent > 0);
+    over.sort((a, b) => (b.spent - b.c.budget) - (a.spent - a.c.budget));
+    over.slice(0, 4).forEach((x) => push(0, `${x.c.emoji} ${x.c.name} : ${fmt(x.spent)} dépensés pour ${fmt(x.c.budget)} budgétés — dépassement de ${fmt(x.spent - x.c.budget)}.`));
+    if (over.length === 0 && totalSpent > 0)
+        push(3, `Aucun poste en dépassement ce mois-ci — beau travail. 👏`);
+    if (reste < 0)
+        push(0, `Tu as dépensé ${fmt(-reste)} de plus que tes revenus ce mois. Priorité : réduire les postes en dépassement ci-dessus.`);
+    else if (income > 0) {
+        const tx = reste / income;
+        if (tx >= 0.2)
+            push(3, `Il te reste ${fmt(reste)} ce mois (${Math.round(tx * 100)} % de tes revenus). Solide — verse-en une partie à ton épargne avant de la dépenser.`);
+        else if (tx > 0)
+            push(2, `Il te reste ${fmt(reste)} ce mois (${Math.round(tx * 100)} % de tes revenus). Vise plutôt ~20 % pour épargner sereinement.`);
+        else
+            push(1, `Tu as dépensé quasiment tous tes revenus : peu de marge pour l'épargne ce mois. Cherche 1–2 postes à réduire.`);
+    }
+    if (nonReparti > 0.5)
+        push(2, `Tu as ${fmt(nonReparti)} d'épargne non répartie. Assigne-les à une enveloppe (Sécurité, Voyage…) pour donner un rôle à chaque euro.`);
+    else if (nonReparti < -0.5)
+        push(1, `Tu as réparti ${fmt(-nonReparti)} de plus que ton épargne totale. Réajuste tes enveloppes ou augmente le pot commun.`);
+    const secu = sav.envelopes.find((e) => /s[eé]curit|urgence|coup dur/i.test(e.name));
+    const moisRef = totalBudget > 0 ? totalBudget : totalSpent;
+    if (secu && moisRef > 0) {
+        const mois = secu.amount / moisRef;
+        if (mois < 3)
+            push(2, `Ton enveloppe ${secu.emoji} ${secu.name} couvre ~${mois.toFixed(1)} mois de dépenses. Vise 3 à 6 mois, soit ${fmt(3 * moisRef)} à ${fmt(6 * moisRef)}.`);
+        else if (mois <= 6)
+            push(3, `Ton fonds ${secu.name} couvre ~${mois.toFixed(1)} mois de dépenses : belle marge de sécurité.`);
+        else
+            push(2, `Ton fonds ${secu.name} couvre ~${mois.toFixed(1)} mois. Au-delà de 6 mois, tu peux orienter le surplus vers un projet (Voyage, Futur plaisir…).`);
+    }
+    const near = sav.envelopes.filter((e) => e.goal > 0 && e.amount < e.goal).map((e) => ({ e, pct: e.amount / e.goal })).sort((a, b) => b.pct - a.pct)[0];
+    if (near && near.pct >= 0.5)
+        push(3, `Enveloppe ${near.e.emoji} ${near.e.name} : tu es à ${Math.round(near.pct * 100)} % de ton objectif. Encore ${fmt(near.e.goal - near.e.amount)} !`);
+    if (totalSpent === 0)
+        push(2, `Saisis d'abord tes dépenses du mois dans l'onglet Dépenses : les conseils s'affineront en direct.`);
+    items.sort((a, b) => a.sev - b.sev);
+    const colors = ["#c6483c", "#c8791e", "#0f5b57", "#0e8a6b"];
+    const labels = ["Priorité", "À surveiller", "Piste", "Bien joué"];
+    return (React.createElement("div", null,
+        React.createElement("div", { className: "card" },
+            React.createElement("span", { className: "badge" }, "Coach budget"),
+            React.createElement("p", { className: "sm muted", style: { margin: "10px 0 0" } },
+                "Analyse en direct de ton profil \u00AB ",
+                profile.label,
+                " \u00BB (",
+                monthLabel(state.activeMonth),
+                "). Tout est calcul\u00E9 dans ton navigateur \u2014 rien n'est envoy\u00E9 en ligne, aucune cl\u00E9 requise.")),
+        React.createElement("div", { style: { marginTop: 12 } }, items.map((it, i) => (React.createElement("div", { key: i, className: "card", style: { marginTop: 8, borderLeft: `4px solid ${colors[it.sev]}` } },
+            React.createElement("div", { className: "xs", style: { color: colors[it.sev], fontWeight: 600, marginBottom: 4 } }, labels[it.sev]),
+            React.createElement("div", { className: "sm", style: { lineHeight: 1.55 } }, it.text))))),
+        React.createElement("div", { className: "note", style: { marginTop: 14 } }, "Conseils indicatifs g\u00E9n\u00E9r\u00E9s \u00E0 partir de tes chiffres \u2014 informations g\u00E9n\u00E9rales, pas un conseil financier personnalis\u00E9.")));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App, null));
+
+</script>
+</body>
+</html>
