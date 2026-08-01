@@ -95,21 +95,19 @@
 
 <script>
 "use strict";
-const { useState, useEffect, useMemo } = React;
+const { useState, useEffect } = React;
 const KEY = "mon_budget_v1";
 const uid = () => Math.random().toString(36).slice(2, 9);
 /* ---------- Persistance (localStorage + repli mémoire) ---------- */
 let memFallback = null;
 const store = {
-    load() {
-        try {
-            const r = localStorage.getItem(KEY);
-            return r ? JSON.parse(r) : memFallback;
-        }
-        catch (e) {
-            return memFallback;
-        }
-    },
+    load() { try {
+        const r = localStorage.getItem(KEY);
+        return r ? JSON.parse(r) : memFallback;
+    }
+    catch (e) {
+        return memFallback;
+    } },
     save(s) { try {
         localStorage.setItem(KEY, JSON.stringify(s));
     }
@@ -117,7 +115,7 @@ const store = {
         memFallback = s;
     } },
 };
-/* ---------- Valeurs de départ (tout modifiable) ---------- */
+/* ---------- Valeurs de départ ---------- */
 const catsAujourdhui = () => [
     { id: uid(), emoji: "🛒", name: "Courses", budget: 250 },
     { id: uid(), emoji: "⛽", name: "Essence", budget: 100 },
@@ -147,17 +145,15 @@ const catsAppartement = () => [
     { id: uid(), emoji: "🩹", name: "Santé", budget: 20 },
     { id: uid(), emoji: "📦", name: "Divers", budget: 60 },
 ];
-const nowMonth = () => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-};
+const nowMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
 const DEFAULTS = () => ({
     activeTab: "depenses",
     activeProfile: "aujourdhui",
     activeMonth: nowMonth(),
+    income: { lines: [{ id: uid(), label: "Salaire", amount: 1698, date: null }] },
     profiles: {
-        aujourdhui: { label: "Aujourd'hui", income: 1698, categories: catsAujourdhui() },
-        appartement: { label: "Appartement", income: 1698, categories: catsAppartement() },
+        aujourdhui: { label: "Aujourd'hui", categories: catsAujourdhui() },
+        appartement: { label: "Appartement", categories: catsAppartement() },
     },
     expenses: {},
     savings: {
@@ -168,28 +164,40 @@ const DEFAULTS = () => ({
             { id: uid(), emoji: "🛟", name: "Sécurité", amount: 900, goal: 3000 },
             { id: uid(), emoji: "✨", name: "Futur plaisir", amount: 100, goal: 500 },
         ],
+        contributions: [],
     },
-    ai: { apiKey: "", model: "claude-sonnet-5" },
 });
 /* ---------- Helpers ---------- */
 const fmt = (n) => (Number(n) || 0).toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + " €";
-const parseAmount = (s) => {
-    const v = parseFloat(String(s).replace(",", ".").replace(/[^0-9.]/g, ""));
-    return isNaN(v) ? 0 : v;
-};
-const monthLabel = (key) => {
-    const [y, m] = key.split("-").map(Number);
-    const s = new Date(y, m - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
-    return s.charAt(0).toUpperCase() + s.slice(1);
-};
-const fillClass = (spent, budget) => {
-    const pct = budget > 0 ? spent / budget : spent > 0 ? 1.1 : 0;
-    return pct > 1 ? "fill-over" : pct > 0.85 ? "fill-warn" : "fill-ok";
-};
+const parseAmount = (s) => { const v = parseFloat(String(s).replace(",", ".").replace(/[^0-9.]/g, "")); return isNaN(v) ? 0 : v; };
+const monthLabel = (key) => { const [y, m] = key.split("-").map(Number); const s = new Date(y, m - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" }); return s.charAt(0).toUpperCase() + s.slice(1); };
+const fillClass = (spent, budget) => { const pct = budget > 0 ? spent / budget : spent > 0 ? 1.1 : 0; return pct > 1 ? "fill-over" : pct > 0.85 ? "fill-warn" : "fill-ok"; };
+const incomeForMonth = (income, monthKey) => (income && income.lines ? income.lines : []).reduce((s, l) => (!l.date || l.date.slice(0, 7) === monthKey) ? s + (l.amount || 0) : s, 0);
 function App() {
     const [state, setState] = useState(null);
     const [ready, setReady] = useState(false);
-    useEffect(() => { setState(store.load() || DEFAULTS()); setReady(true); }, []);
+    useEffect(() => {
+        let s = store.load() || DEFAULTS();
+        // Migration / normalisation des données existantes
+        if (!s.income) {
+            const oi = (s.profiles && s.profiles.aujourdhui && s.profiles.aujourdhui.income) || 0;
+            s.income = { lines: [{ id: uid(), label: "Salaire", amount: oi, date: null }] };
+        }
+        if (!s.income.lines)
+            s.income.lines = [];
+        if (s.profiles)
+            Object.keys(s.profiles).forEach((k) => { const p = s.profiles[k]; if (p) {
+                delete p.income;
+                if (!p.categories)
+                    p.categories = [];
+            } });
+        if (!s.savings)
+            s.savings = DEFAULTS().savings;
+        if (!s.savings.contributions)
+            s.savings.contributions = [];
+        setState(s);
+        setReady(true);
+    }, []);
     useEffect(() => { if (ready && state)
         store.save(state); }, [state, ready]);
     const patch = (fn) => setState((p) => { const n = structuredClone(p); fn(n); return n; });
@@ -200,15 +208,57 @@ function App() {
             React.createElement("div", { className: "logo" }, "\uD83D\uDCB6"),
             React.createElement("div", null,
                 React.createElement("h1", null, "Mon budget"),
-                React.createElement("div", { className: "sm muted", style: { marginTop: 2 } }, "Enveloppes & \u00E9pargne"))),
-        React.createElement("div", { className: "tabbar" }, [["depenses", "Dépenses"], ["epargne", "Épargne"], ["ia", "Conseils"]].map(([k, lbl]) => (React.createElement("button", { key: k, className: "tab" + (state.activeTab === k ? " active" : ""), onClick: () => patch((s) => { s.activeTab = k; }) }, lbl)))),
+                React.createElement("div", { className: "sm muted", style: { marginTop: 2 } }, "Revenus, d\u00E9penses & \u00E9pargne"))),
+        React.createElement("div", { className: "tabbar" }, [["depenses", "Dépenses"], ["data", "Data"], ["epargne", "Épargne"], ["ia", "Conseils"]].map(([k, lbl]) => (React.createElement("button", { key: k, className: "tab" + (state.activeTab === k ? " active" : ""), onClick: () => patch((s) => { s.activeTab = k; }) }, lbl)))),
         state.activeTab === "depenses" && React.createElement(Depenses, { state: state, patch: patch }),
+        state.activeTab === "data" && React.createElement(Data, { state: state }),
         state.activeTab === "epargne" && React.createElement(Epargne, { state: state, patch: patch }),
         state.activeTab === "ia" && React.createElement(Conseils, { state: state }),
         React.createElement("p", { className: "foot" },
             "Donn\u00E9es enregistr\u00E9es automatiquement dans ton navigateur (localStorage).",
             React.createElement("br", null),
-            "Rien n'est envoy\u00E9 en ligne, sauf si tu lances une analyse IA.")));
+            "Rien n'est envoy\u00E9 en ligne.")));
+}
+/* ================= PANNEAU REVENUS (budget général partagé) ================= */
+function IncomePanel({ state, patch }) {
+    const [editing, setEditing] = useState(null);
+    const [ed, setEd] = useState({ label: "", amount: "", date: "" });
+    const [adding, setAdding] = useState(false);
+    const [ne, setNe] = useState({ label: "", amount: "", date: "" });
+    const lines = state.income.lines || [];
+    const save = (id) => patch((s) => { const l = s.income.lines.find((x) => x.id === id); if (l) {
+        l.label = ed.label.trim() || l.label;
+        l.amount = parseAmount(ed.amount);
+        l.date = ed.date || null;
+    } });
+    const del = (id) => { if (!confirm("Supprimer ce revenu ?"))
+        return; patch((s) => { s.income.lines = s.income.lines.filter((x) => x.id !== id); }); };
+    const add = () => { if (!ne.label.trim() && !ne.amount)
+        return; patch((s) => { s.income.lines.push({ id: uid(), label: ne.label.trim() || "Revenu", amount: parseAmount(ne.amount), date: ne.date || null }); }); setNe({ label: "", amount: "", date: "" }); setAdding(false); };
+    return (React.createElement("div", { className: "card", style: { marginBottom: 16 } },
+        React.createElement("div", { className: "sm muted", style: { marginBottom: 8, fontWeight: 500 } }, "Revenus \u2014 budget g\u00E9n\u00E9ral (identique sur tes deux profils)"),
+        lines.map((l) => editing === l.id ? (React.createElement("div", { key: l.id, className: "inline", style: { marginTop: 0, flexWrap: "wrap" } },
+            React.createElement("input", { value: ed.label, placeholder: "Libell\u00E9", onChange: (e) => setEd({ ...ed, label: e.target.value }), style: { flex: "1 1 100px" } }),
+            React.createElement("input", { className: "w-amt", inputMode: "decimal", value: ed.amount, placeholder: "\u20AC", onChange: (e) => setEd({ ...ed, amount: e.target.value }) }),
+            React.createElement("input", { type: "date", value: ed.date, onChange: (e) => setEd({ ...ed, date: e.target.value }), style: { flex: "1 1 130px" } }),
+            React.createElement("button", { className: "btn btn-ok", onClick: () => { save(l.id); setEditing(null); } }, "\u2713"),
+            React.createElement("button", { className: "btn btn-ghost", onClick: () => setEditing(null) }, "\u2715"))) : (React.createElement("div", { key: l.id, className: "row between", style: { padding: "7px 0", borderBottom: "1px solid var(--soft)" } },
+            React.createElement("span", { className: "sm", style: { minWidth: 0 } },
+                l.label,
+                " \u00B7 ",
+                React.createElement("b", null, fmt(l.amount)),
+                " ",
+                React.createElement("span", { className: "muted" }, l.date ? "· " + new Date(l.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : "· tous les mois")),
+            React.createElement("span", { className: "row gap" },
+                React.createElement("button", { className: "icon-btn", style: { color: "var(--muted)" }, onClick: () => { setEditing(l.id); setEd({ label: l.label, amount: String(l.amount), date: l.date || "" }); } }, "\u270E"),
+                React.createElement("button", { className: "icon-btn", onClick: () => del(l.id) }, "\uD83D\uDDD1"))))),
+        adding ? (React.createElement("div", { className: "inline", style: { flexWrap: "wrap" } },
+            React.createElement("input", { autoFocus: true, value: ne.label, placeholder: "Ex : APL, CAF, prime\u2026", onChange: (e) => setNe({ ...ne, label: e.target.value }), style: { flex: "1 1 100px" } }),
+            React.createElement("input", { className: "w-amt", inputMode: "decimal", value: ne.amount, placeholder: "\u20AC", onChange: (e) => setNe({ ...ne, amount: e.target.value }) }),
+            React.createElement("input", { type: "date", value: ne.date, onChange: (e) => setNe({ ...ne, date: e.target.value }), style: { flex: "1 1 130px" } }),
+            React.createElement("button", { className: "btn btn-ok", onClick: add }, "\u2713"),
+            React.createElement("button", { className: "btn btn-ghost", onClick: () => setAdding(false) }, "\u2715"))) : React.createElement("button", { className: "addbtn", style: { marginTop: 10 }, onClick: () => setAdding(true) }, "+ Ajouter un revenu (APL, CAF\u2026)"),
+        React.createElement("div", { className: "note", style: { marginTop: 12 } }, "Sans date = compt\u00E9 chaque mois. Avec une date = revenu ponctuel, compt\u00E9 seulement sur ce mois-l\u00E0.")));
 }
 /* ================= ONGLET DÉPENSES ================= */
 function Depenses({ state, patch }) {
@@ -220,73 +270,31 @@ function Depenses({ state, patch }) {
     const [ed, setEd] = useState({ emoji: "", name: "", budget: "" });
     const [addingCat, setAddingCat] = useState(false);
     const [nc, setNc] = useState({ emoji: "📦", name: "", budget: "" });
-    const [editIncome, setEditIncome] = useState(false);
-    const [incDraft, setIncDraft] = useState("");
+    const [showIncome, setShowIncome] = useState(false);
     const profile = state.profiles[state.activeProfile];
     const expKey = `${state.activeProfile}|${state.activeMonth}`;
     const monthExp = state.expenses[expKey] || [];
     const spentByCat = (id) => monthExp.filter((e) => e.catId === id).reduce((s, e) => s + e.amount, 0);
     const totalBudget = profile.categories.reduce((s, c) => s + (c.budget || 0), 0);
     const totalSpent = monthExp.reduce((s, e) => s + e.amount, 0);
-    const income = profile.income || 0;
+    const income = incomeForMonth(state.income, state.activeMonth);
     const reste = income - totalSpent;
-    const shiftMonth = (d) => patch((s) => {
-        const [y, m] = s.activeMonth.split("-").map(Number);
-        const nd = new Date(y, m - 1 + d, 1);
-        s.activeMonth = `${nd.getFullYear()}-${String(nd.getMonth() + 1).padStart(2, "0")}`;
-    });
-    const addExpense = (catId) => {
-        const a = parseAmount(expAmount);
-        if (a <= 0)
-            return;
-        patch((s) => {
-            const k = `${s.activeProfile}|${s.activeMonth}`;
-            (s.expenses[k] = s.expenses[k] || []).push({ id: uid(), catId, amount: a, note: expNote.trim(), ts: Date.now() });
-        });
-        setExpAmount("");
-        setExpNote("");
-        setAddingExpFor(null);
-        setExpandedCat(catId);
-    };
-    const delExpense = (id) => {
-        if (!confirm("Supprimer cette dépense ? Cette action est définitive."))
-            return;
-        patch((s) => {
-            const k = `${s.activeProfile}|${s.activeMonth}`;
-            s.expenses[k] = (s.expenses[k] || []).filter((e) => e.id !== id);
-        });
-    };
-    const saveCat = (id) => patch((s) => {
-        const c = s.profiles[s.activeProfile].categories.find((x) => x.id === id);
-        if (c) {
-            c.emoji = ed.emoji || "📦";
-            c.name = ed.name.trim() || c.name;
-            c.budget = parseAmount(ed.budget);
-        }
-    });
-    const delCat = (id) => {
-        const c = profile.categories.find((x) => x.id === id);
-        if (!confirm(`Supprimer le poste « ${c ? c.name : ""} » ? Cette action est définitive.`))
-            return;
-        patch((s) => {
-            s.profiles[s.activeProfile].categories =
-                s.profiles[s.activeProfile].categories.filter((x) => x.id !== id);
-        });
-    };
-    const addCat = () => {
-        if (!nc.name.trim())
-            return;
-        patch((s) => {
-            s.profiles[s.activeProfile].categories.push({ id: uid(), emoji: nc.emoji || "📦", name: nc.name.trim(), budget: parseAmount(nc.budget) });
-        });
-        setNc({ emoji: "📦", name: "", budget: "" });
-        setAddingCat(false);
-    };
-    const resetMonth = () => {
-        if (!confirm("Effacer toutes les dépenses de ce mois ? Tes budgets ne changent pas."))
-            return;
-        patch((s) => { s.expenses[`${s.activeProfile}|${s.activeMonth}`] = []; });
-    };
+    const shiftMonth = (d) => patch((s) => { const [y, m] = s.activeMonth.split("-").map(Number); const nd = new Date(y, m - 1 + d, 1); s.activeMonth = `${nd.getFullYear()}-${String(nd.getMonth() + 1).padStart(2, "0")}`; });
+    const addExpense = (catId) => { const a = parseAmount(expAmount); if (a <= 0)
+        return; patch((s) => { const k = `${s.activeProfile}|${s.activeMonth}`; (s.expenses[k] = s.expenses[k] || []).push({ id: uid(), catId, amount: a, note: expNote.trim(), ts: Date.now() }); }); setExpAmount(""); setExpNote(""); setAddingExpFor(null); setExpandedCat(catId); };
+    const delExpense = (id) => { if (!confirm("Supprimer cette dépense ? Cette action est définitive."))
+        return; patch((s) => { const k = `${s.activeProfile}|${s.activeMonth}`; s.expenses[k] = (s.expenses[k] || []).filter((e) => e.id !== id); }); };
+    const saveCat = (id) => patch((s) => { const c = s.profiles[s.activeProfile].categories.find((x) => x.id === id); if (c) {
+        c.emoji = ed.emoji || "📦";
+        c.name = ed.name.trim() || c.name;
+        c.budget = parseAmount(ed.budget);
+    } });
+    const delCat = (id) => { const c = profile.categories.find((x) => x.id === id); if (!confirm(`Supprimer le poste « ${c ? c.name : ""} » ? Cette action est définitive.`))
+        return; patch((s) => { s.profiles[s.activeProfile].categories = s.profiles[s.activeProfile].categories.filter((x) => x.id !== id); }); };
+    const addCat = () => { if (!nc.name.trim())
+        return; patch((s) => { s.profiles[s.activeProfile].categories.push({ id: uid(), emoji: nc.emoji || "📦", name: nc.name.trim(), budget: parseAmount(nc.budget) }); }); setNc({ emoji: "📦", name: "", budget: "" }); setAddingCat(false); };
+    const resetMonth = () => { if (!confirm("Effacer toutes les dépenses de ce mois ? Tes budgets ne changent pas."))
+        return; patch((s) => { s.expenses[`${s.activeProfile}|${s.activeMonth}`] = []; }); };
     return (React.createElement("div", null,
         React.createElement("div", { className: "pillbar" }, Object.entries(state.profiles).map(([k, p]) => (React.createElement("button", { key: k, className: "pill" + (state.activeProfile === k ? " active" : ""), onClick: () => patch((s) => { s.activeProfile = k; }) }, p.label)))),
         React.createElement("div", { className: "row between", style: { marginBottom: 12 } },
@@ -296,11 +304,8 @@ function Depenses({ state, patch }) {
         React.createElement("div", { className: "hero" },
             React.createElement("div", { className: "row between" },
                 React.createElement("span", { className: "sm", style: { opacity: .8 } }, "Reste \u00E0 vivre ce mois"),
-                React.createElement("button", { className: "hlink", onClick: () => { setEditIncome(true); setIncDraft(String(income)); } }, "\u270E revenus")),
-            editIncome ? (React.createElement("div", { className: "inline" },
-                React.createElement("input", { autoFocus: true, value: incDraft, inputMode: "decimal", onChange: (e) => setIncDraft(e.target.value), style: { width: 130 } }),
-                React.createElement("button", { className: "btn btn-ok", onClick: () => { patch((s) => { s.profiles[s.activeProfile].income = parseAmount(incDraft); }); setEditIncome(false); } }, "\u2713"),
-                React.createElement("button", { className: "btn btn-ghost", onClick: () => setEditIncome(false) }, "\u2715"))) : React.createElement("div", { className: "big" }, fmt(reste)),
+                React.createElement("button", { className: "hlink", onClick: () => setShowIncome((v) => !v) }, showIncome ? "fermer" : "✎ revenus")),
+            React.createElement("div", { className: "big" }, fmt(reste)),
             React.createElement("div", { className: "hbar" },
                 React.createElement("span", { style: { width: (income > 0 ? Math.min(100, totalSpent / income * 100) : 0) + "%" } })),
             React.createElement("div", { className: "row between xs", style: { opacity: .85, marginTop: 8 } },
@@ -315,12 +320,13 @@ function Depenses({ state, patch }) {
                 fmt(totalBudget),
                 " \u00B7 ",
                 totalBudget > income
-                    ? React.createElement("span", { className: "warn", style: { color: "#f4c98a" } },
+                    ? React.createElement("span", { style: { color: "#f4c98a" } },
                         "d\u00E9passe tes revenus de ",
                         fmt(totalBudget - income))
                     : React.createElement("span", null,
                         fmt(income - totalBudget),
                         " non budg\u00E9t\u00E9"))),
+        showIncome && React.createElement(IncomePanel, { state: state, patch: patch }),
         profile.categories.map((c) => {
             const spent = spentByCat(c.id), r = c.budget - spent;
             const pct = c.budget > 0 ? Math.min(100, spent / c.budget * 100) : spent > 0 ? 100 : 0;
@@ -379,6 +385,92 @@ function Depenses({ state, patch }) {
             "\u21BA R\u00E9initialiser les d\u00E9penses de ",
             monthLabel(state.activeMonth))));
 }
+/* ================= ONGLET DATA (jour / semaine / mois) ================= */
+function Data({ state }) {
+    const [period, setPeriod] = useState("mois");
+    const [offset, setOffset] = useState(0);
+    const profile = state.profiles[state.activeProfile];
+    const catMap = {};
+    profile.categories.forEach((c) => { catMap[c.id] = c; });
+    const all = Object.entries(state.expenses)
+        .filter(([k]) => k.indexOf(state.activeProfile + "|") === 0)
+        .reduce((acc, [, arr]) => acc.concat(arr), []);
+    const range = (() => {
+        const now = new Date();
+        if (period === "jour") {
+            const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+            const start = d.getTime(), end = start + 86400000;
+            const label = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+            return { start, end, label: label.charAt(0).toUpperCase() + label.slice(1) };
+        }
+        if (period === "semaine") {
+            const base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const dow = (base.getDay() + 6) % 7;
+            const monday = new Date(base.getFullYear(), base.getMonth(), base.getDate() - dow + offset * 7);
+            const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+            const start = monday.getTime(), end = start + 7 * 86400000;
+            const opt = { day: "numeric", month: "short" };
+            return { start, end, label: `Semaine du ${monday.toLocaleDateString("fr-FR", opt)} au ${sunday.toLocaleDateString("fr-FR", opt)}` };
+        }
+        const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+        const start = d.getTime(), end = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
+        const label = d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+        return { start, end, label: label.charAt(0).toUpperCase() + label.slice(1) };
+    })();
+    const inRange = all.filter((e) => e.ts >= range.start && e.ts < range.end).sort((a, b) => b.ts - a.ts);
+    const total = inRange.reduce((s, e) => s + e.amount, 0);
+    const saved = (state.savings.contributions || []).filter((c) => c.ts >= range.start && c.ts < range.end).reduce((s, c) => s + c.amount, 0);
+    const byCat = {};
+    inRange.forEach((e) => { byCat[e.catId] = (byCat[e.catId] || 0) + e.amount; });
+    const breakdown = Object.entries(byCat).map(([id, amt]) => ({ id, amt })).sort((a, b) => b.amt - a.amt);
+    const maxCat = breakdown.length ? breakdown[0].amt : 0;
+    return (React.createElement("div", null,
+        React.createElement("div", { className: "pillbar" }, [["jour", "Jour"], ["semaine", "Semaine"], ["mois", "Mois"]].map(([k, lbl]) => (React.createElement("button", { key: k, className: "pill" + (period === k ? " active" : ""), onClick: () => { setPeriod(k); setOffset(0); } }, lbl)))),
+        React.createElement("div", { className: "row between", style: { marginBottom: 12 } },
+            React.createElement("button", { className: "navbtn", onClick: () => setOffset(offset - 1) }, "\u2039"),
+            React.createElement("span", { className: "sm", style: { fontWeight: 500, textAlign: "center" } }, range.label),
+            React.createElement("button", { className: "navbtn", onClick: () => setOffset(offset + 1), disabled: offset >= 0, style: { opacity: offset >= 0 ? .35 : 1 } }, "\u203A")),
+        React.createElement("div", { className: "hero" },
+            React.createElement("span", { className: "sm", style: { opacity: .8 } },
+                "D\u00E9pens\u00E9 \u2014 ",
+                profile.label),
+            React.createElement("div", { className: "big" }, fmt(total)),
+            React.createElement("div", { className: "xs", style: { opacity: .8, marginTop: 6 } },
+                inRange.length,
+                " d\u00E9pense",
+                inRange.length > 1 ? "s" : "",
+                " sur la p\u00E9riode")),
+        React.createElement("div", { className: "card", style: { marginTop: 12, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" } },
+            React.createElement("span", { className: "sm muted" }, "\uD83D\uDCB0 Mis de c\u00F4t\u00E9 sur la p\u00E9riode"),
+            React.createElement("span", { style: { fontWeight: 700, color: "var(--emerald)" } }, fmt(saved))),
+        breakdown.length > 0 && (React.createElement("div", { className: "card", style: { marginBottom: 12 } },
+            React.createElement("div", { className: "sm muted", style: { marginBottom: 10, fontWeight: 500 } }, "Par poste"),
+            breakdown.map(({ id, amt }) => {
+                const c = catMap[id];
+                return (React.createElement("div", { key: id, style: { marginBottom: 10 } },
+                    React.createElement("div", { className: "row between", style: { marginBottom: 4 } },
+                        React.createElement("span", { className: "sm" }, c ? c.emoji + " " + c.name : "❔ Poste supprimé"),
+                        React.createElement("span", { className: "sm", style: { fontWeight: 600 } }, fmt(amt))),
+                    React.createElement("div", { className: "bar" },
+                        React.createElement("span", { className: "fill-ok", style: { width: (maxCat > 0 ? amt / maxCat * 100 : 0) + "%" } }))));
+            }))),
+        React.createElement("div", { className: "card" },
+            React.createElement("div", { className: "sm muted", style: { marginBottom: 8, fontWeight: 500 } }, "D\u00E9tail des d\u00E9penses"),
+            inRange.length === 0 ? (React.createElement("div", { className: "sm muted" }, "Aucune d\u00E9pense sur cette p\u00E9riode.")) : inRange.map((e) => {
+                const c = catMap[e.catId];
+                return (React.createElement("div", { key: e.id, style: { display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--soft)" } },
+                    React.createElement("span", { className: "sm muted", style: { minWidth: 0 } },
+                        new Date(e.ts).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }),
+                        " \u00B7 ",
+                        c ? c.emoji + " " + c.name : "❔",
+                        e.note ? " · " + e.note : ""),
+                    React.createElement("span", { className: "sm", style: { fontWeight: 600, whiteSpace: "nowrap", marginLeft: 8 } }, fmt(e.amount))));
+            })),
+        React.createElement("div", { className: "note", style: { marginTop: 14 } },
+            "D\u00E9penses = profil \u00AB ",
+            profile.label,
+            " \u00BB. L'\u00E9pargne mise de c\u00F4t\u00E9 est commune aux deux profils. Utilise \u2039 \u203A pour parcourir les p\u00E9riodes.")));
+}
 /* ================= ONGLET ÉPARGNE ================= */
 function Epargne({ state, patch }) {
     const [editTotal, setEditTotal] = useState(false);
@@ -387,30 +479,36 @@ function Epargne({ state, patch }) {
     const [ed, setEd] = useState({ emoji: "", name: "", amount: "", goal: "" });
     const [adding, setAdding] = useState(false);
     const [ne, setNe] = useState({ emoji: "🎯", name: "", amount: "", goal: "" });
+    const [showContrib, setShowContrib] = useState(false);
+    const [contrib, setContrib] = useState({ amount: "", envId: "" });
     const sav = state.savings;
     const reparti = sav.envelopes.reduce((s, e) => s + (e.amount || 0), 0);
     const nonReparti = sav.total - reparti;
-    const saveEnv = (id) => patch((s) => {
-        const e = s.savings.envelopes.find((x) => x.id === id);
-        if (e) {
-            e.emoji = ed.emoji || "🎯";
-            e.name = ed.name.trim() || e.name;
-            e.amount = parseAmount(ed.amount);
-            e.goal = parseAmount(ed.goal);
-        }
-    });
-    const delEnv = (id) => {
-        const e = sav.envelopes.find((x) => x.id === id);
-        if (!confirm(`Supprimer l'enveloppe « ${e ? e.name : ""} » ? Cette action est définitive.`))
+    const saveEnv = (id) => patch((s) => { const e = s.savings.envelopes.find((x) => x.id === id); if (e) {
+        e.emoji = ed.emoji || "🎯";
+        e.name = ed.name.trim() || e.name;
+        e.amount = parseAmount(ed.amount);
+        e.goal = parseAmount(ed.goal);
+    } });
+    const delEnv = (id) => { const e = sav.envelopes.find((x) => x.id === id); if (!confirm(`Supprimer l'enveloppe « ${e ? e.name : ""} » ? Cette action est définitive.`))
+        return; patch((s) => { s.savings.envelopes = s.savings.envelopes.filter((x) => x.id !== id); }); };
+    const addEnv = () => { if (!ne.name.trim())
+        return; patch((s) => { s.savings.envelopes.push({ id: uid(), emoji: ne.emoji || "🎯", name: ne.name.trim(), amount: parseAmount(ne.amount), goal: parseAmount(ne.goal) }); }); setNe({ emoji: "🎯", name: "", amount: "", goal: "" }); setAdding(false); };
+    const mettreDeCote = () => {
+        const a = parseAmount(contrib.amount);
+        if (a <= 0)
             return;
-        patch((s) => { s.savings.envelopes = s.savings.envelopes.filter((x) => x.id !== id); });
-    };
-    const addEnv = () => {
-        if (!ne.name.trim())
-            return;
-        patch((s) => { s.savings.envelopes.push({ id: uid(), emoji: ne.emoji || "🎯", name: ne.name.trim(), amount: parseAmount(ne.amount), goal: parseAmount(ne.goal) }); });
-        setNe({ emoji: "🎯", name: "", amount: "", goal: "" });
-        setAdding(false);
+        patch((s) => {
+            s.savings.total += a;
+            if (contrib.envId) {
+                const e = s.savings.envelopes.find((x) => x.id === contrib.envId);
+                if (e)
+                    e.amount += a;
+            }
+            (s.savings.contributions = s.savings.contributions || []).push({ id: uid(), amount: a, ts: Date.now(), envId: contrib.envId || null });
+        });
+        setContrib({ amount: "", envId: "" });
+        setShowContrib(false);
     };
     return (React.createElement("div", null,
         React.createElement("div", { className: "hero" },
@@ -425,13 +523,24 @@ function Epargne({ state, patch }) {
                 React.createElement("span", null,
                     "R\u00E9parti ",
                     fmt(reparti)),
-                React.createElement("span", null, nonReparti < 0
-                    ? React.createElement("span", { style: { color: "#f4c98a" } },
-                        "sur-r\u00E9parti de ",
-                        fmt(-nonReparti))
-                    : React.createElement("span", null,
-                        "Non r\u00E9parti ",
-                        fmt(nonReparti))))),
+                React.createElement("span", null, nonReparti < 0 ? React.createElement("span", { style: { color: "#f4c98a" } },
+                    "sur-r\u00E9parti de ",
+                    fmt(-nonReparti)) : React.createElement("span", null,
+                    "Non r\u00E9parti ",
+                    fmt(nonReparti))))),
+        showContrib ? (React.createElement("div", { className: "card", style: { marginTop: 12, marginBottom: 12 } },
+            React.createElement("span", { className: "label" }, "Montant \u00E0 mettre de c\u00F4t\u00E9"),
+            React.createElement("input", { autoFocus: true, inputMode: "decimal", value: contrib.amount, placeholder: "\u20AC", onChange: (e) => setContrib({ ...contrib, amount: e.target.value }) }),
+            React.createElement("span", { className: "label", style: { marginTop: 10 } }, "Vers quelle enveloppe ?"),
+            React.createElement("select", { value: contrib.envId, onChange: (e) => setContrib({ ...contrib, envId: e.target.value }) },
+                React.createElement("option", { value: "" }, "Pot commun (non r\u00E9parti)"),
+                sav.envelopes.map((e) => React.createElement("option", { key: e.id, value: e.id },
+                    e.emoji,
+                    " ",
+                    e.name))),
+            React.createElement("div", { className: "acts" },
+                React.createElement("button", { className: "btn btn-ok grow", onClick: mettreDeCote }, "Enregistrer"),
+                React.createElement("button", { className: "btn btn-ghost", onClick: () => setShowContrib(false) }, "Annuler")))) : React.createElement("button", { className: "addbtn", style: { marginTop: 12, marginBottom: 12 }, onClick: () => setShowContrib(true) }, "\uFF0B Mettre de c\u00F4t\u00E9 ce mois"),
         React.createElement("div", { className: "sm muted", style: { margin: "0 2px 8px" } }, "R\u00E9partis ton pot commun en enveloppes \uD83D\uDC47"),
         sav.envelopes.map((e) => {
             const pct = e.goal > 0 ? Math.min(100, e.amount / e.goal * 100) : e.amount > 0 ? 100 : 0;
@@ -482,7 +591,7 @@ function Epargne({ state, patch }) {
             React.createElement("div", { className: "acts" },
                 React.createElement("button", { className: "btn btn-primary grow", onClick: addEnv }, "Ajouter"),
                 React.createElement("button", { className: "btn btn-ghost", onClick: () => setAdding(false) }, "Annuler")))) : React.createElement("button", { className: "addbtn", onClick: () => setAdding(true) }, "+ Ajouter une enveloppe"),
-        React.createElement("div", { className: "note", style: { marginTop: 14 } }, "\uD83D\uDCA1 Rep\u00E8re utile : une enveloppe \u00AB S\u00E9curit\u00E9 \u00BB (fonds d'urgence) solide vise g\u00E9n\u00E9ralement l'\u00E9quivalent de 3 \u00E0 6 mois de tes d\u00E9penses courantes.")));
+        React.createElement("div", { className: "note", style: { marginTop: 14 } }, "\uD83D\uDCA1 \u00AB Mettre de c\u00F4t\u00E9 \u00BB enregistre ton \u00E9pargne avec une date : tu la retrouves par mois dans l'onglet Data. Une enveloppe \u00AB S\u00E9curit\u00E9 \u00BB solide vise 3 \u00E0 6 mois de tes d\u00E9penses.")));
 }
 /* ================= ONGLET CONSEILS (coach local, sans clé) ================= */
 function Conseils({ state }) {
@@ -490,7 +599,7 @@ function Conseils({ state }) {
     const expKey = `${state.activeProfile}|${state.activeMonth}`;
     const monthExp = state.expenses[expKey] || [];
     const spentByCat = (id) => monthExp.filter((e) => e.catId === id).reduce((s, e) => s + e.amount, 0);
-    const income = profile.income || 0;
+    const income = incomeForMonth(state.income, state.activeMonth);
     const totalBudget = profile.categories.reduce((s, c) => s + (c.budget || 0), 0);
     const totalSpent = monthExp.reduce((s, e) => s + e.amount, 0);
     const reste = income - totalSpent;
