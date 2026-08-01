@@ -45,7 +45,10 @@
   .hbar>span{display:block;height:100%;background:rgba(255,255,255,.75);border-radius:99px;transition:width .3s}
   .hlink{background:rgba(255,255,255,.15);border:0;color:#eafaf4;font-size:11px;padding:4px 8px;
     border-radius:8px;cursor:pointer;font-family:inherit}
-  .env{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:15px;margin-bottom:10px}
+  .env{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:15px;margin-bottom:10px;transition:opacity .15s}
+  .env.dragging{opacity:.35}
+  .drag-handle{cursor:grab;touch-action:none;color:#c3ccc8;font-size:18px;line-height:1;padding:6px 4px 6px 0;user-select:none;-webkit-user-select:none}
+  .drag-handle:active{cursor:grabbing}
   .env .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
   .emoji{font-size:20px}
   .name{font-weight:500;font-size:14px}
@@ -95,7 +98,7 @@
 
 <script>
 "use strict";
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 const KEY = "mon_budget_v1";
 const uid = () => Math.random().toString(36).slice(2, 9);
 /* ---------- Persistance (localStorage + repli mémoire) ---------- */
@@ -293,6 +296,77 @@ function Depenses({ state, patch }) {
     const [addingCat, setAddingCat] = useState(false);
     const [nc, setNc] = useState({ emoji: "📦", name: "", budget: "" });
     const [showIncome, setShowIncome] = useState(false);
+    const [draggingId, setDraggingId] = useState(null);
+    const catRefs = useRef({});
+    const orderRef = useRef(state.categories);
+    const dragRef = useRef({ id: null, ghost: null, offsetY: 0 });
+    useEffect(() => { orderRef.current = state.categories; }, [state.categories]);
+    const onDragMove = (e) => {
+        const { id, ghost, offsetY } = dragRef.current;
+        if (!ghost)
+            return;
+        const y = (e.touches ? e.touches[0].clientY : e.clientY);
+        ghost.style.top = (y - offsetY) + "px";
+        const order = orderRef.current;
+        const from = order.findIndex((c) => c.id === id);
+        if (from === -1)
+            return;
+        for (let i = 0; i < order.length; i++) {
+            if (i === from)
+                continue;
+            const el = catRefs.current[order[i].id];
+            if (!el)
+                continue;
+            const r = el.getBoundingClientRect();
+            const mid = r.top + r.height / 2;
+            const movingDown = i > from;
+            if ((movingDown && y > mid) || (!movingDown && y < mid)) {
+                patch((s) => {
+                    const arr = s.categories;
+                    const f = arr.findIndex((c) => c.id === id);
+                    if (f === -1)
+                        return;
+                    const [item] = arr.splice(f, 1);
+                    arr.splice(i, 0, item);
+                });
+                break;
+            }
+        }
+    };
+    const onDragEnd = () => {
+        const { ghost } = dragRef.current;
+        if (ghost && ghost.parentNode)
+            ghost.parentNode.removeChild(ghost);
+        dragRef.current = { id: null, ghost: null, offsetY: 0 };
+        setDraggingId(null);
+        window.removeEventListener("pointermove", onDragMove);
+        window.removeEventListener("pointerup", onDragEnd);
+        window.removeEventListener("pointercancel", onDragEnd);
+    };
+    const onDragStart = (e, id) => {
+        e.preventDefault();
+        const el = catRefs.current[id];
+        if (!el)
+            return;
+        const rect = el.getBoundingClientRect();
+        const ghost = el.cloneNode(true);
+        ghost.style.position = "fixed";
+        ghost.style.top = rect.top + "px";
+        ghost.style.left = rect.left + "px";
+        ghost.style.width = rect.width + "px";
+        ghost.style.margin = "0";
+        ghost.style.pointerEvents = "none";
+        ghost.style.zIndex = "9999";
+        ghost.style.opacity = "0.95";
+        ghost.style.boxShadow = "0 10px 28px rgba(0,0,0,.2)";
+        ghost.style.transform = "scale(1.02)";
+        document.body.appendChild(ghost);
+        dragRef.current = { id, ghost, offsetY: e.clientY - rect.top };
+        setDraggingId(id);
+        window.addEventListener("pointermove", onDragMove);
+        window.addEventListener("pointerup", onDragEnd);
+        window.addEventListener("pointercancel", onDragEnd);
+    };
     const monthExp = state.expenses[state.activeMonth] || [];
     const spentByCat = (id) => monthExp.filter((e) => e.catId === id).reduce((s, e) => s + e.amount, 0);
     const totalBudget = state.categories.reduce((s, c) => s + (c.budget || 0), 0);
@@ -366,9 +440,10 @@ function Depenses({ state, patch }) {
                         React.createElement("input", { className: "w-amt", inputMode: "decimal", value: ed.budget, placeholder: "\u20AC", onChange: (e) => setEd({ ...ed, budget: e.target.value }) }),
                         React.createElement("button", { className: "btn btn-ok", onClick: () => { saveCat(c.id); setEditingCat(null); } }, "\u2713"),
                         React.createElement("button", { className: "btn btn-ghost", onClick: () => setEditingCat(null) }, "\u2715"))));
-            return (React.createElement("div", { className: "env", key: c.id },
+            return (React.createElement("div", { className: "env" + (draggingId === c.id ? " dragging" : ""), key: c.id, ref: (el) => { catRefs.current[c.id] = el; } },
                 React.createElement("div", { className: "top" },
                     React.createElement("div", { className: "row gap", style: { minWidth: 0 } },
+                        React.createElement("span", { className: "drag-handle", onPointerDown: (e) => onDragStart(e, c.id) }, "\u283F"),
                         React.createElement("span", { className: "emoji" }, c.emoji),
                         React.createElement("div", { style: { minWidth: 0 } },
                             React.createElement("div", { className: "name" }, c.name),
